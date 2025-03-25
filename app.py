@@ -3,9 +3,19 @@ import os
 import time
 from datetime import datetime
 from auth import AuthManager
+from chat_stats import ChatStatistics
+from time_analysis import TimelineAnalysis
 import preprocessor
+import helper
+import matplotlib.pyplot as plt
+import plotly.express as px
+
+
+st.set_page_config(page_title="What's Insight 🤔", page_icon="🤔")
 
 auth_manager = AuthManager()
+chat_stats = ChatStatistics()
+timeline_analysis = TimelineAnalysis()
 # Ensure session state is initialized
 if "user" not in st.session_state:
     st.session_state.user = None
@@ -33,12 +43,11 @@ def save_uploaded_file(uploaded_file, user_email):
 
 # **User Logged In UI**
 if st.session_state.user:
-    # **Show Welcome Message Only If No File Is Uploaded**
-
+    user_role = st.session_state.user["role"]
     # **Show File Uploader Only If No File Is Uploaded**
     if not st.session_state.file_uploaded:
         st.markdown("""
-        <h1 style='text-align: center;'>We missed you! 😍</h1>
+        <h1 style='text-align: center;'><span style='color: #FFEA00;'>We missed you! 😍</h1>
         <h2 style='text-align: center;'>Are you ready to witness the insights?</h2>
             """, unsafe_allow_html=True)
 
@@ -47,7 +56,7 @@ if st.session_state.user:
         if st.button("Sign out"):
                 st.session_state.user = None
                 st.session_state.uploaded_file_path = None
-                st.session_state.chat_text = None
+                st.session_state.df = None
                 st.session_state.file_uploaded = False
                 st.rerun()
 
@@ -67,7 +76,7 @@ if st.session_state.user:
             st.title("What'sInsight 🤔")
             st.sidebar.image("D:\Projects\SE-Project\What'sInsight\magnifying-glass.png")
             st.text("Select Analysis Mode")
-            mode = st.radio("Choose an option", ["Chat Statistics", "Timeline Analysis", "Word Cloud", "Sentiment Analysis"], index=0)
+            mode = st.radio("Choose an option", ["Chat Statistics", "Timeline Analysis", "Word Cloud", "Sentiment Analysis" , "Detective Mode"], index=0)
 
             if mode != st.session_state.mode:
                 st.session_state.mode = mode
@@ -83,32 +92,217 @@ if st.session_state.user:
                 st.session_state.file_uploaded = False
                 st.rerun()
 
-        # 🎯 **Display Analysis Based on Selected Mode**
-        st.subheader(f"{mode} Analysis")
-        st.write(f"Analysis started for mode: **{mode}** on file: **{st.session_state.uploaded_file_path}**")
+
+        st.markdown(f"""<h1 style='text-align: center;text-shadow: 3px 3px 5px rgba(255, 255, 0, 0.5);'>
+        <span style='color: #FFEA00;'> Chat</span> 
+        <span style='color: #FFAB40;'>Analysis</span> 
+        <span style='color: #00E5FF;'>Playground</span>
+        </h1>""" , unsafe_allow_html=True)
+
+        st.write(f"Analysis started for mode: **{mode}**")
+        df = st.session_state.df
+        #fetch unique users
+       
 
         if mode == "Chat Statistics":
-            st.write("📊 Chat Statistics are being analyzed...")
-            st.dataframe(st.session_state.df)
+            user_list = df['user'].unique().tolist()
+            user_list.sort()
+            user_list.insert(0,"Overall")
+            selected_user = st.selectbox("Show analysis wrt",user_list)
+
+            if st.button("Show Analysis") or selected_user== 'Overall':
+                st.write("📊 Chat Statistics are being analyzed...")
+            # Stats Area
+                num_messages, words, num_media_messages, num_links = chat_stats.fetch_stats(selected_user,df)
+                st.markdown("""
+    <h1 style='text-align: center; 
+               color: #FFEA00;
+               text-shadow: 3px 3px 5px rgba(255, 255, 0, 0.5);'>
+               Top Statistics 
+                </h1>
+               """, unsafe_allow_html=True)
+
+                col1, col2, col3, col4 = st.columns(4)
+
+
+                with col1:
+                    st.markdown(f"<h3 style='color: #00FFFF;'>Total Messages</h3>", unsafe_allow_html=True)
+                    st.subheader(num_messages)
+
+                with col2:
+                    st.markdown(f"<h3 style='color: #00FFFF;'>Total Words</h3>", unsafe_allow_html=True)
+                    st.subheader(words)
+
+                with col3:
+                    st.markdown(f"<h3 style='color: #00FFFF;'>Media Shared</h3>", unsafe_allow_html=True)
+                    st.subheader(num_media_messages)
+
+                with col4:
+                    st.markdown(f"<h3 style='color: #00FFFF;'>Links Shared</h3>", unsafe_allow_html=True)
+                    st.subheader(num_links)
+
+                avg_msg_per_day, avg_msg_length, pareto_valid, media_msg_ratio = chat_stats.fetch_math_stats(selected_user, df)
+
+                # Heading
+                st.markdown("""
+                <h1 style='text-align: center; 
+                        color: #FFEA00;
+                        text-shadow: 3px 3px 5px rgba(255, 255, 0, 0.5);'>
+                        Mathematical Statistics
+                            </h1>
+                        """, unsafe_allow_html=True)
+
+                # Columns for layout
+                col1, col2, col3, col4 = st.columns(4)
+
+                with col1:
+                    st.markdown(f"<h2 style='color: #00FFFF;'>Avg. Messages/Day</h2>", unsafe_allow_html=True)
+                    st.header(avg_msg_per_day)
+
+                with col2:
+                    st.markdown(f"<h2 style='color: #00FFFF;'>Avg. Msg Length</h2>", unsafe_allow_html=True)
+                    st.header(avg_msg_length)
+
+                with col3:
+                    st.markdown(f"<h2 style='color: #00FFFF;'>Pareto Valid?</h2>", unsafe_allow_html=True)
+                    st.header(pareto_valid)
+
+                with col4:
+                    st.markdown(f"<h2 style='color: #00FFFF;'>Media Msg Ratio</h2>", unsafe_allow_html=True)
+                    st.header(media_msg_ratio)
+
+
+ 
+                    
+                most_word, longest_msg_length, most_emoji, active_period = chat_stats.fetch_interesting_stats(selected_user, df)
+ 
+                
+                st.markdown("""
+    <h1 style='text-align: center; 
+               color: #FFEA00;
+               text-shadow: 3px 3px 5px rgba(255, 255, 0, 0.5);'>
+               Interesting Statistics
+                </h1>
+               """, unsafe_allow_html=True)
+
+                col1, col2, col3, col4 = st.columns(4)
+
+                with col1:
+                    st.markdown(f"<h3 style='color: #00FFFF;'>Most Used Word</h3>", unsafe_allow_html=True)
+                    st.subheader(most_word)  
+
+                with col2:
+                    st.markdown(f"<h3 style='color: #00FFFF;'>Longest Message Length</h3>", unsafe_allow_html=True)
+                    st.subheader(longest_msg_length)  
+
+                with col3:
+                    st.markdown(f"<h3 style='color: #00FFFF;'>Most Used Emoji</h3>", unsafe_allow_html=True)
+                    st.subheader(most_emoji)  
+
+                with col4:
+                    st.markdown(f"<h3 style='color: #00FFFF;'>Most Active Period</h3>", unsafe_allow_html=True)
+                    st.subheader(active_period)
         elif mode == "Timeline Analysis":
-            st.write("📅 Generating Timeline Insights...")
+            user_list = df['user'].unique().tolist()
+            user_list.sort()
+            user_list.insert(0,"Overall")
+            selected_user = st.selectbox("Show analysis wrt",user_list)
+
+            if st.button("Show Analysis") or selected_user== 'Overall':
+                st.markdown(
+                    """
+                    <style>
+                    .title {
+                        color: yellow;
+                        font-size: 28px;
+                        font-weight: bold;
+                        text-shadow: 2px 2px 5px black;
+                        text-align: center;
+                    }
+                    </style>
+                    """,
+                    unsafe_allow_html=True
+                )
+                st.write("📅 Generating Timeline Insights...")
+
+                # Monthly Timeline
+                st.markdown('<p class="title">📅 Monthly Timeline</p>', unsafe_allow_html=True)
+                timeline = timeline_analysis.monthly_timeline(selected_user, df)
+
+                fig = px.line(timeline, x='time', y='message', 
+                            title="",  # Removed title from Plotly (Handled by HTML)
+                            line_shape='linear', 
+                            markers=True)
+
+                fig.update_layout(height=350, width=600, xaxis_title="Month", yaxis_title="Messages", template="plotly_white")
+
+                st.plotly_chart(fig, use_container_width=True)
+
+                # Daily Timeline
+                st.markdown('<p class="title">📆 Daily Timeline</p>', unsafe_allow_html=True)
+                daily_timeline = timeline_analysis.daily_timeline(selected_user, df)
+
+                fig2 = px.line(daily_timeline, x='date', y='message', 
+                            title="",  # Removed title from Plotly
+                            line_shape='linear', 
+                            markers=True)
+
+                fig2.update_layout(height=350, width=600, xaxis_title="Date", yaxis_title="Messages", template="plotly_white")
+
+                st.plotly_chart(fig2, use_container_width=True)
+
+
+
+
+
         elif mode == "Word Cloud":
             st.write("☁️ Creating Word Cloud...")
         elif mode == "Sentiment Analysis":
             st.write("😊 Analyzing Sentiments...")
+        elif mode == "Detective Mode":
+            if user_role == "investigator":
+                st.write("wooh hoo , Welcome to investigator mode")
+            else:
+                st.warning("🚫 You do not have access to Detective Mode!")
 
-# **Login UI (If User Not Logged In)**
+# Login UI (If User Not Logged In)
 else:
-    st.title("Welcome to What's Insight 🤔")
-    email = st.text_input("Email Address")
-    password = st.text_input("Password", type="password")
+    st.markdown("""
+    <h1 style='text-align: center;
+               text-shadow: 3px 3px 5px rgba(138, 43, 226, 0.7);'>
+               Welcome to <span style='color: violet;'>What's Insight 🤔</span>
+    </h1>
+    """, unsafe_allow_html=True)
 
-    if st.button("Login"):
-        st.session_state.user = auth_manager.login(email , password)
-        if st.session_state.user:
-            st.success("Login Successful! 🎉")
-            time.sleep(1)
-            st.rerun() 
-        else:
-            st.error("Incorrect username or password. Try again!")
+    auth_option = st.radio("Select an option:", ["Login", "Sign Up"])
 
+    if auth_option == "Login":
+        email = st.text_input("Email Address")
+        password = st.text_input("Password", type="password")
+        if st.button("Login"):
+            st.session_state.user = auth_manager.login(email , password)
+            if st.session_state.user:
+                st.success("Login Successful! 🎉")
+                time.sleep(1)
+                st.rerun() 
+            else:
+                st.error("Incorrect username or password. Try again!")
+    elif auth_option == "Sign Up":
+        email = st.text_input("Email Address")
+        password = st.text_input("Password", type="password")
+        if st.button("Signup"):
+        
+            signup_status = auth_manager.signup(email , password)
+
+            if signup_status == 0:
+                st.error("Password too short! It must be at least 6 characters.")
+            elif signup_status == 1:
+                st.warning("This email is already registered. Try logging in instead.")
+            elif signup_status == 2:
+                st.success("Account created successfully! 🎉 Please login.")
+                st.balloons()
+                time.sleep(1)
+                st.rerun()
+            else:
+                st.error("Sign-up failed due to an unknown error. Please try again.")
+        

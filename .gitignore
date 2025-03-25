@@ -30,3 +30,5 @@ conda-meta/
 *.log
 *.tmp
 .DS_Store
+
+helper.py

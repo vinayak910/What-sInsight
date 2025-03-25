@@ -1,5 +1,6 @@
 import re
 import pandas as pd
+
 def preprocess(file_contents):
     # Regular expression to match date, time, and message
     pattern = r'(\d{1,2}/\d{1,2}/\d{2,4}),\s(\d{1,2}:\d{2}\s[APM]{2})\s-\s([^:]+):\s(.+)'
@@ -21,9 +22,10 @@ def preprocess(file_contents):
     # Convert Date column to datetime format
     df["date"] = pd.to_datetime(df["date"], format="%m/%d/%y")
 
-    # Extract year, month, day, hour, and minute
+    # Extract year, month number, day, hour, and minute
     df["year"] = df["date"].dt.year
-    df["month"] = df["date"].dt.month
+    df["month_num"] = df["date"].dt.month  # Month number
+    df["month"] = df["date"].dt.strftime("%B")  # Full month name
     df["day"] = df["date"].dt.day
 
     # Convert time format and extract hour & minute
@@ -31,6 +33,6 @@ def preprocess(file_contents):
     df["minute"] = pd.to_datetime(df["user_message"].str.split(", ").str[1], format="%I:%M %p").dt.minute
 
     # Final DataFrame
-    df = df[["user_message", "date", "user", "message", "year", "month", "day", "hour", "minute"]]
+    df = df[["user_message", "date", "user", "message", "year", "month_num", "month", "day", "hour", "minute"]]
 
     return df
