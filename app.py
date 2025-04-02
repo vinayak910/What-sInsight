@@ -7,8 +7,11 @@ from chat_stats import ChatStatistics
 from time_analysis import TimelineAnalysis
 import preprocessor
 import helper
+from activity_map_analysis import ActivityMap
+from preprocessor import Preprocessor
 import matplotlib.pyplot as plt
 import plotly.express as px
+import seaborn as sns
 
 
 st.set_page_config(page_title="What's Insight 🤔", page_icon="🤔")
@@ -16,6 +19,8 @@ st.set_page_config(page_title="What's Insight 🤔", page_icon="🤔")
 auth_manager = AuthManager()
 chat_stats = ChatStatistics()
 timeline_analysis = TimelineAnalysis()
+activity_map = ActivityMap()
+preprocess = Preprocessor()
 # Ensure session state is initialized
 if "user" not in st.session_state:
     st.session_state.user = None
@@ -62,7 +67,7 @@ if st.session_state.user:
 
         if uploaded_file is not None:
             file_contents = uploaded_file.read().decode("utf-8")  # Decode file content
-            df = preprocessor.preprocess(file_contents)
+            df = preprocess.preprocess(file_contents)
             st.session_state.df = df
             file_path = save_uploaded_file(uploaded_file, st.session_state.user["email"])
             st.session_state.uploaded_file_path = file_path
@@ -76,7 +81,7 @@ if st.session_state.user:
             st.title("What'sInsight 🤔")
             st.sidebar.image("D:\Projects\SE-Project\What'sInsight\magnifying-glass.png")
             st.text("Select Analysis Mode")
-            mode = st.radio("Choose an option", ["Chat Statistics", "Timeline Analysis", "Word Cloud", "Sentiment Analysis" , "Detective Mode"], index=0)
+            mode = st.radio("Choose an option", ["Chat Statistics", "Timeline Analysis","Activity Map", "Word Cloud", "Detective Mode"], index=0)
 
             if mode != st.session_state.mode:
                 st.session_state.mode = mode
@@ -226,7 +231,13 @@ if st.session_state.user:
                 st.write("📅 Generating Timeline Insights...")
 
                 # Monthly Timeline
-                st.markdown('<p class="title">📅 Monthly Timeline</p>', unsafe_allow_html=True)
+                st.markdown("""
+    <h1 style='text-align: center; 
+               color: #FFEA00;
+               text-shadow: 3px 3px 5px rgba(255, 255, 0, 0.5);'>
+               Monthly Timeline
+                </h1>
+               """, unsafe_allow_html=True)                
                 timeline = timeline_analysis.monthly_timeline(selected_user, df)
 
                 fig = px.line(timeline, x='time', y='message', 
@@ -239,7 +250,13 @@ if st.session_state.user:
                 st.plotly_chart(fig, use_container_width=True)
 
                 # Daily Timeline
-                st.markdown('<p class="title">📆 Daily Timeline</p>', unsafe_allow_html=True)
+                st.markdown("""
+    <h1 style='text-align: center; 
+               color: #FFEA00;
+               text-shadow: 3px 3px 5px rgba(255, 255, 0, 0.5);'>
+               Daily Timeline
+                </h1>
+               """, unsafe_allow_html=True)                
                 daily_timeline = timeline_analysis.daily_timeline(selected_user, df)
 
                 fig2 = px.line(daily_timeline, x='date', y='message', 
@@ -253,12 +270,83 @@ if st.session_state.user:
 
 
 
+        elif mode == "Activity Map":
+            user_list = df['user'].unique().tolist()
+            user_list.sort()
+            user_list.insert(0,"Overall")
+            selected_user = st.selectbox("Show analysis wrt",user_list)
+                        
+            if st.button("Show Analysis") or selected_user== 'Overall':
+
+                st.markdown(
+                    """
+                    <style>
+                    .title {
+                        color: yellow;
+                        font-size: 28px;
+                        font-weight: bold;
+                        text-shadow: 2px 2px 5px black;
+                        text-align: center;
+                    }
+                    </style>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+                st.markdown("""
+    <h1 style='text-align: center; 
+               color: #FFEA00;
+               text-shadow: 3px 3px 5px rgba(255, 255, 0, 0.5);'>
+               Activity Map
+                </h1>
+               """, unsafe_allow_html=True)
+
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    st.markdown('<p class="title">📅 Most Busy Day</p>', unsafe_allow_html=True)
+                    busy_day = activity_map.week_activity_map(selected_user, df)
+
+                    fig = px.bar(
+                        x=busy_day.index, 
+                        y=busy_day.values, 
+                        labels={'x': 'Day of Week', 'y': 'Message Count'},
+                        title="",  # Removed title (Handled by HTML)
+                        color_discrete_sequence=['purple']
+                    )
+                    fig.update_layout(height=350, width=350, template="plotly_white")
+                    st.plotly_chart(fig, use_container_width=True)
+
+                with col2:
+                    st.markdown('<p class="title">📆 Most Busy Month</p>', unsafe_allow_html=True)
+                    busy_month = activity_map.month_activity_map(selected_user, df)
+
+                    fig2 = px.bar(
+                        x=busy_month.index, 
+                        y=busy_month.values, 
+                        labels={'x': 'Month', 'y': 'Message Count'},
+                        title="",  # Removed title (Handled by HTML)
+                        color_discrete_sequence=['orange']
+                    )
+                    fig2.update_layout(height=350, width=350, template="plotly_white")
+                    st.plotly_chart(fig2, use_container_width=True)
+
+                st.markdown("""
+    <h1 style='text-align: center; 
+               color: #FFEA00;
+               text-shadow: 3px 3px 5px rgba(255, 255, 0, 0.5);'>
+               Weekly Activity Map
+                </h1>
+               """, unsafe_allow_html=True)
+                user_heatmap = activity_map.activity_heatmap(selected_user,df)
+                fig,ax = plt.subplots()
+                ax = sns.heatmap(user_heatmap)
+                st.pyplot(fig)
 
 
         elif mode == "Word Cloud":
             st.write("☁️ Creating Word Cloud...")
-        elif mode == "Sentiment Analysis":
-            st.write("😊 Analyzing Sentiments...")
+
         elif mode == "Detective Mode":
             if user_role == "investigator":
                 st.write("wooh hoo , Welcome to investigator mode")

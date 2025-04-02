@@ -7,7 +7,7 @@ class ChatUploader:
         self.base_dir.mkdir(parents=True, exist_ok=True)
 
     def save_file(self, uploaded_file, user_email):
-        """Saves chat file inside a user-specific folder with a unique timestamped name."""
+        "Saves chat file inside a user-specific folder with a unique timestamped name."
         
         # 🔹 Create user-specific folder
         user_folder = self.base_dir / user_email.replace("@", "_").replace(".", "_")
