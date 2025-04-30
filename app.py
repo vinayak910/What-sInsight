@@ -1,4 +1,10 @@
 import streamlit as st
+from collections import Counter
+from email.message import EmailMessage
+import smtplib
+
+
+import re 
 import os
 import time
 from datetime import datetime
@@ -12,6 +18,12 @@ from preprocessor import Preprocessor
 import matplotlib.pyplot as plt
 import plotly.express as px
 import seaborn as sns
+import word_cloud
+import matplotlib.font_manager as fm
+
+# Set font for emojis
+plt.rcParams['font.family'] = 'Segoe UI Emoji'
+
 
 
 st.set_page_config(page_title="What's Insight 🤔", page_icon="🤔")
@@ -103,8 +115,8 @@ if st.session_state.user:
         <span style='color: #FFAB40;'>Analysis</span> 
         <span style='color: #00E5FF;'>Playground</span>
         </h1>""" , unsafe_allow_html=True)
-
         st.write(f"Analysis started for mode: **{mode}**")
+
         df = st.session_state.df
         #fetch unique users
        
@@ -345,20 +357,203 @@ if st.session_state.user:
 
 
         elif mode == "Word Cloud":
-            st.write("☁️ Creating Word Cloud...")
+
+            st.markdown("""
+    <h1 style='text-align: center; 
+               color: #FFEA00;
+               text-shadow: 3px 3px 5px rgba(255, 255, 0, 0.5);'>
+               Word Cloud
+                </h1>
+               """, unsafe_allow_html=True)
+            new_df = df[~df['message'].str.contains('media omitted', case=False, na=False)]
+            new_df = new_df[new_df['message']!='null']
+            user_list = new_df['user'].unique().tolist()
+            user_list.sort()
+            user_list.insert(0,"Overall")
+            selected_user = st.selectbox("Show analysis wrt",user_list)
+            if st.button("Show Analysis") or selected_user== 'Overall':
+
+
+            
+                df_wc = word_cloud.create_wordcloud(selected_user,new_df)
+                fig,ax = plt.subplots()
+                ax.imshow(df_wc)
+                st.pyplot(fig)
+            
+                most_common_df = word_cloud.most_common_words(selected_user,new_df)
+
+                fig,ax = plt.subplots()
+
+                ax.barh(most_common_df[0],most_common_df[1])
+                plt.xticks(rotation='vertical')
+
+                st.markdown("""
+        <h1 style='text-align: center; 
+                color: #FFEA00;
+                text-shadow: 3px 3px 5px rgba(255, 255, 0, 0.5);'>
+                Most Common Words
+                    </h1>
+                """, unsafe_allow_html=True)
+                st.pyplot(fig)
+
+                st.markdown("""
+        <h1 style='text-align: center; 
+                color: #FFEA00;
+                text-shadow: 3px 3px 5px rgba(255, 255, 0, 0.5);'>
+                Emoji Analysis
+                    </h1>
+                """, unsafe_allow_html=True)
+
+            emoji_df = word_cloud.emoji_helper(selected_user , new_df)
+
+
+            col1,col2 = st.columns(2)
+
+            with col1:
+                st.dataframe(emoji_df)
+            with col2:
+                top_emojis = emoji_df.head(5)
+                other_count = emoji_df['count'][5:].sum()
+
+                labels = top_emojis['emoji'].tolist()
+                sizes = top_emojis['count'].tolist()
+
+                if other_count > 0:
+                    labels.append("Others")
+                    sizes.append(other_count)
+
+                # Set emoji-supporting font
+                import matplotlib.font_manager as fm
+                emoji_font_path = "C:\\Windows\\Fonts\\seguiemj.ttf"
+                emoji_font = fm.FontProperties(fname=emoji_font_path)
+                plt.rcParams['font.family'] = emoji_font.get_name()
+
+                fig, ax = plt.subplots(figsize=(6, 6))  # Slightly bigger
+                wedges, texts, autotexts = ax.pie(sizes, labels=labels, autopct='%1.2f%%',
+                                                startangle=90, textprops={'fontsize': 12})
+                plt.setp(autotexts, size=10, weight='bold')
+                ax.axis('equal')
+                plt.title("Top Emojis", fontsize=14)                
+                st.pyplot(fig)
+
 
         elif mode == "Detective Mode":
             if user_role == "investigator":
-                st.write("wooh hoo , Welcome to investigator mode")
+
+                st.markdown("""
+### 🕵️‍♂️ Detective Mode Activated
+This section detects and highlights users who frequently use abusive language in the group. It also shows sample messages and top bad words used by them.
+""")
+
+                
+                st.markdown("""
+                <h1 style='text-align: center; 
+               color: #FFEA00;
+               text-shadow: 3px 3px 5px rgba(255, 255, 0, 0.5);'>
+               Top 5 abusive users
+                </h1>
+               """, unsafe_allow_html=True)
+                new_df = df[~df['message'].str.contains('media omitted', case=False, na=False)]
+                new_df = new_df[new_df['message']!='null']
+
+                # Step 2: Optional smart filtering if dataset is large
+                threshold = 5000  # you can change this based on your testing
+                if len(new_df) > threshold:
+                    st.info("🔍 Large dataset detected. Optimizing for performance...")
+
+                    # 1. Remove duplicate messages
+                    new_df = new_df.drop_duplicates(subset='message')
+
+                    # 2. Remove very short messages
+                    new_df = new_df[new_df['message'].str.split().str.len() > 5]
+
+                    # 3. Focus on top 10 active users
+                    top_users = new_df['user'].value_counts().head(10).index.tolist()
+                    new_df = new_df[new_df['user'].isin(top_users)]
+
+                    # 4. Sample 50% randomly
+                    new_df = new_df.sample(frac=0.5, random_state=42)
+
+                # Step 3: User selection
+                user_list = new_df['user'].unique().tolist()
+                user_list.sort()
+                user_list.insert(0, "Overall")
+                selected_user = st.selectbox("Show analysis wrt", user_list)
+
+                # Step 4: Profanity Detection
+                if st.button("Show Analysis") or selected_user == 'Overall':
+                    from better_profanity import profanity
+
+                    # Hindi + English abuses
+                    abusive_words = ["motherfucker", "bitch", "bastard", "asshole", "hell", "fuck", "shit",
+                        "chutiya", "bhosdike", "madarchod", "behenchod", "gandu", "launde", "randi", 
+                        "loda", "lodu",  "bhenchod", "chod", "gaand", "gand" , "lund" , "randwe" ,"betichod" , "kute" , "mc" , "bc" ,"bkl" ,"chodu", "gaandfad" , "gaaaandfaaad", 'raand' , "chakke", 'tatti']
+                    profanity.add_censor_words(abusive_words)
+
+                    if selected_user != "Overall":
+                        temp_df = new_df[new_df['user'] == selected_user]
+                    else:
+                        temp_df = new_df.copy()
+
+                    temp_df['is_abusive'] = temp_df['message'].apply(lambda x: profanity.contains_profanity(str(x).lower()))
+                    abusive_counts = temp_df[temp_df['is_abusive']].groupby('user')['message'].count().sort_values(ascending=False).head(5)
+
+                    st.markdown("### 🔥 Top 5 Users Sending Abusive Messages")
+                    st.bar_chart(abusive_counts)
+
+                    # Expander for messages + top 3 abusive words
+                    with st.expander("View abusive messages"):
+                        for user in abusive_counts.index:
+                            st.markdown(f"**{user}**")
+
+                            user_msgs = temp_df[(temp_df['user'] == user) & (temp_df['is_abusive'])]['message'].tolist()
+
+                            # Count abusive words
+                            word_counts = Counter()
+                            for msg in user_msgs:
+                                words = re.findall(r'\b\w+\b', msg.lower())  # Extract words
+                                abusive_in_msg = [word for word in words if word in abusive_words]
+                                word_counts.update(abusive_in_msg)
+
+                            top_abuses = word_counts.most_common(5)
+
+                            st.markdown("🧨 **Top 5 abusive words used by user:**")
+                            for word, count in top_abuses:
+                                st.write(f"- {word} → {count} times")
+
+                            st.markdown("💬 **Sample Abusive Messages:**")
+                            for msg in user_msgs[:5]:
+                                st.write(f"- {msg}")                
             else:
                 st.warning("🚫 You do not have access to Detective Mode!")
+                st.markdown("""
+### 🕵️‍♂️ About Detective Mode
+This section detects and highlights users who frequently use abusive language in the group. It also shows sample messages and top bad words used by them.
+""")
+                
+
+                st.markdown("## 🔐 Request Access to Detective Mode")
+                st.info("""
+                This mode helps detect and visualize abusive content in chats. 
+                Access is limited to trusted users for privacy and safety reasons.
+
+                📩 **To request access**, please send an email to  
+                **vinayakchhabra545.vc@gmail.com**  
+                with the following details:
+                - The email ID you used to sign up on **What'sInsight**
+                - A short reason why you need access to this feature
+
+                We’ll review your request and get back to you shortly.
+                """)
+
+
 
 # Login UI (If User Not Logged In)
 else:
     st.markdown("""
     <h1 style='text-align: center;
-               text-shadow: 3px 3px 5px rgba(138, 43, 226, 0.7);'>
-               Welcome to <span style='color: violet;'>What's Insight 🤔</span>
+            text-shadow: 3px 3px 5px rgba(138, 43, 226, 0.7);'>
+            Welcome to <span style='color: violet;'>What's Insight 🤔</span>
     </h1>
     """, unsafe_allow_html=True)
 
@@ -368,29 +563,39 @@ else:
         email = st.text_input("Email Address")
         password = st.text_input("Password", type="password")
         if st.button("Login"):
-            st.session_state.user = auth_manager.login(email , password)
-            if st.session_state.user:
-                st.success("Login Successful! 🎉")
-                time.sleep(1)
-                st.rerun() 
-            else:
-                st.error("Incorrect username or password. Try again!")
+            try:
+                st.session_state.user = auth_manager.login(email, password)
+                if st.session_state.user:
+                    st.success("Login Successful! 🎉")
+                    time.sleep(1)
+                    st.rerun() 
+                else:
+                    st.error("Incorrect username or password. Please try again!")
+            except Exception as e:
+                st.error(f"An error occurred during login: {str(e)}")
+
     elif auth_option == "Sign Up":
         email = st.text_input("Email Address")
         password = st.text_input("Password", type="password")
         if st.button("Signup"):
-        
-            signup_status = auth_manager.signup(email , password)
+            try:
+                signup_status = auth_manager.signup(email, password)
 
-            if signup_status == 0:
-                st.error("Password too short! It must be at least 6 characters.")
-            elif signup_status == 1:
-                st.warning("This email is already registered. Try logging in instead.")
-            elif signup_status == 2:
-                st.success("Account created successfully! 🎉 Please login.")
-                st.balloons()
-                time.sleep(1)
-                st.rerun()
-            else:
-                st.error("Sign-up failed due to an unknown error. Please try again.")
-        
+                if signup_status == 0:
+                    st.error("Password too short! It must be at least 6 characters.")
+                elif signup_status == 1:
+                    st.warning("This email is already registered. Try logging in instead.")
+                elif signup_status == 2:
+                    st.success("Account created successfully! 🎉 Please login.")
+                    st.balloons()
+                    time.sleep(1)
+                    st.rerun()
+                else:
+                    st.error("Sign-up failed due to an unknown error. Please try again.")
+            except Exception as e:
+                st.error(f"An error occurred during signup: {str(e)}")
+
+    
+
+
+

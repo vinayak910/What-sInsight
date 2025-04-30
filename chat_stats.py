@@ -23,7 +23,7 @@ class ChatStatistics:
             words.extend(message.split())
 
         # fetch number of media messages
-        num_media_messages = df[df['message'] == '<Media omitted>'].shape[0]
+        num_media_messages = df[df['message'].str.contains('media omitted', case=False, na=False)].shape[0]
 
         # fetch number of links shared
         links = []

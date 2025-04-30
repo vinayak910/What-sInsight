@@ -1,51 +1,56 @@
 import re
 import pandas as pd
+from datetime import datetime
 
 
-class Preprocessor: 
+class Preprocessor:
     def __init__(self):
-        self.pattern = r'(\d{1,2}/\d{1,2}/\d{2,4}),\s(\d{1,2}:\d{2}\s[APM]{2})\s-\s([^:]+):\s(.+)'
-    def preprocess(self , file_contents):
-        # Regular expression to match date, time, and message
-        # Convert file content into lines
+        self.patterns = [
+            r'(\d{1,2}/\d{1,2}/\d{2,4}),\s(\d{1,2}:\d{2}(?:\s?[APap][Mm]))\s-\s([^:]+):\s(.+)',  # old dash format
+            r'\[(\d{1,2}/\d{1,2}/\d{2,4}),\s(\d{1,2}:\d{2}(?::\d{2})?\s?[APap][Mm])\]\s([^:]+):\s(.+)'  # new bracket format
+        ]
+
+    def preprocess(self, file_contents):
         chat_data = file_contents.splitlines()
-
-        # Extract data using regex
         messages = []
-        for line in chat_data:
-            match = re.match(self.pattern, line)
-            if match:
-                date, time, sender, message = match.groups()
-                messages.append([f"{date}, {time}", date, sender, message])
 
-        # Create DataFrame
+        for line in chat_data:
+            for pattern in self.patterns:
+                match = re.match(pattern, line)
+                if match:
+                    date_str, time_str, sender, message = match.groups()
+                    full_datetime = f"{date_str}, {time_str}".replace("\u202f", " ").replace(" ", " ")
+                    messages.append([full_datetime, date_str, sender.strip(), message.strip()])
+                    break  # once matched, skip checking other patterns
+
         df = pd.DataFrame(messages, columns=["user_message", "date", "user", "message"])
 
-        # Convert Date column to datetime format
-        df["date"] = pd.to_datetime(df["date"], format="%m/%d/%y")
+        # Handle date column
+        df["date"] = pd.to_datetime(df["date"], dayfirst=True, errors="coerce")
 
-        # Extract year, month number, day, hour, and minute
         df["year"] = df["date"].dt.year
-        df["month_num"] = df["date"].dt.month  # Month number
-        df["month"] = df["date"].dt.strftime("%B")  # Full month name
+        df["month_num"] = df["date"].dt.month
+        df["month"] = df["date"].dt.strftime("%B")
         df["day"] = df["date"].dt.day
-        df["day_name"] = df["date"].dt.strftime("%A")  # Full day name (Monday, Tuesday, etc.)
+        df["day_name"] = df["date"].dt.strftime("%A")
 
-        # Convert time format and extract hour & minute
-        df["hour"] = pd.to_datetime(df["user_message"].str.split(", ").str[1], format="%I:%M %p").dt.hour
-        df["minute"] = pd.to_datetime(df["user_message"].str.split(", ").str[1], format="%I:%M %p").dt.minute
+        # Time extraction with fallback
+        df["hour"] = pd.to_datetime(df["user_message"].str.split(", ").str[1], format="%I:%M %p", errors="coerce").dt.hour.fillna(
+            pd.to_datetime(df["user_message"].str.split(", ").str[1], format="%I:%M:%S %p", errors="coerce").dt.hour
+        )
+
+        df["minute"] = pd.to_datetime(df["user_message"].str.split(", ").str[1], format="%I:%M %p", errors="coerce").dt.minute.fillna(
+            pd.to_datetime(df["user_message"].str.split(", ").str[1], format="%I:%M:%S %p", errors="coerce").dt.minute
+        )
+
         period = []
-        for hour in df[['day_name', 'hour']]['hour']:
+        for hour in df["hour"].fillna(0).astype(int):
             if hour == 23:
-                period.append(str(hour) + "-" + str('00'))
+                period.append(f"{hour}-00")
             elif hour == 0:
-                period.append(str('00') + "-" + str(hour + 1))
+                period.append("00-1")
             else:
-                period.append(str(hour) + "-" + str(hour + 1))
+                period.append(f"{hour}-{hour + 1}")
+        df["period"] = period
 
-        df['period'] = period
-
-        # Final DataFrame
-        df = df[["user_message", "date", "user", "message", "year", "month_num", "month", "day", "day_name", "hour", "minute", "period"]]
-
-        return df
+        return df[["user_message", "date", "user", "message", "year", "month_num", "month", "day", "day_name", "hour", "minute", "period"]]
