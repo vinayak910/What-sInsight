@@ -35,7 +35,3 @@ If you want to run this project locally, follow these steps:
 Use Streamlit to run the app:
 streamlit run app.py
 
-
----
-
-Now the WhatsInsight web app will open in your browser.
