@@ -1,14 +1,10 @@
 import streamlit as st
 from collections import Counter
-from email.message import EmailMessage
-import smtplib
-
-
-import re 
 import os
+import re
 import time
 from datetime import datetime
-from auth import AuthManager
+
 from chat_stats import ChatStatistics
 from time_analysis import TimelineAnalysis
 import preprocessor
@@ -24,104 +20,45 @@ import matplotlib.font_manager as fm
 # Set font for emojis
 plt.rcParams['font.family'] = 'Segoe UI Emoji'
 
-
-
+# Page Config
 st.set_page_config(page_title="What's Insight 🤔", page_icon="🤔")
 
-auth_manager = AuthManager()
+# Initialize objects
 chat_stats = ChatStatistics()
 timeline_analysis = TimelineAnalysis()
 activity_map = ActivityMap()
 preprocess = Preprocessor()
-# Ensure session state is initialized
-if "user" not in st.session_state:
-    st.session_state.user = None
-if "mode" not in st.session_state:
-    st.session_state.mode = "Chat Statistics"
-if "uploaded_file_path" not in st.session_state:
-    st.session_state.uploaded_file_path = None
-if "df" not in st.session_state:
-    st.session_state.df = None
-if "file_uploaded" not in st.session_state:
-    st.session_state.file_uploaded = False  # Track file upload status
 
-def save_uploaded_file(uploaded_file, user_email):
-    """Saves the uploaded file in a user-specific folder with timestamp."""
-    user_folder = f"uploads/{user_email.replace('@', '_').replace('.', '_')}"
-    os.makedirs(user_folder, exist_ok=True)
+# Title
+st.markdown("""
+<h1 style='text-align: center;text-shadow: 3px 3px 5px rgba(138, 43, 226, 0.7);'>
+Welcome to <span style='color: violet;'>What's Insight 🤔</span>
+</h1>
+""", unsafe_allow_html=True)
 
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    file_path = os.path.join(user_folder, f"chat_{timestamp}.txt")
+# Upload chat file
+st.subheader("📂 Upload your WhatsApp chat file (txt only)")
+uploaded_file = st.file_uploader("Choose a file", type=["txt"])
 
-    with open(file_path, "wb") as f:
-        f.write(uploaded_file.getbuffer())
+if uploaded_file is not None:
+    file_contents = uploaded_file.read().decode("utf-8")
+    df = preprocess.preprocess(file_contents)
 
-    return file_path
+    # Sidebar
+    st.sidebar.title("What'sInsight 🤔")
+    st.sidebar.image("D:/Projects/SE-Project/What'sInsight/magnifying-glass.png", width=100)
+    mode = st.sidebar.radio("Choose an option", ["Chat Statistics", "Timeline Analysis", "Activity Map", "Word Cloud", "Detective Mode"])
 
-# **User Logged In UI**
-if st.session_state.user:
-    user_role = st.session_state.user["role"]
-    # **Show File Uploader Only If No File Is Uploaded**
-    if not st.session_state.file_uploaded:
-        st.markdown("""
-        <h1 style='text-align: center;'><span style='color: #FFEA00;'>We missed you! 😍</h1>
-        <h2 style='text-align: center;'>Are you ready to witness the insights?</h2>
-            """, unsafe_allow_html=True)
-
-        st.subheader("Upload your chat file")
-        uploaded_file = st.file_uploader("Drag and drop file here", type=["txt"], help="Limit 200MB per file")
-        if st.button("Sign out"):
-                st.session_state.user = None
-                st.session_state.uploaded_file_path = None
-                st.session_state.df = None
-                st.session_state.file_uploaded = False
-                st.rerun()
-
-        if uploaded_file is not None:
-            file_contents = uploaded_file.read().decode("utf-8")  # Decode file content
-            df = preprocess.preprocess(file_contents)
-            st.session_state.df = df
-            file_path = save_uploaded_file(uploaded_file, st.session_state.user["email"])
-            st.session_state.uploaded_file_path = file_path
-            st.session_state.file_uploaded = True  # Hide upload UI
-            st.success(f"✅ File saved: {file_path}")
-            st.rerun()  # Refresh UI to hide welcome message and uploader
-
-    # **Show Sidebar & Analysis Only After File Upload**
-    if st.session_state.file_uploaded:
-        with st.sidebar:
-            st.title("What'sInsight 🤔")
-            st.sidebar.image("D:\Projects\SE-Project\What'sInsight\magnifying-glass.png")
-            st.text("Select Analysis Mode")
-            mode = st.radio("Choose an option", ["Chat Statistics", "Timeline Analysis","Activity Map", "Word Cloud", "Detective Mode"], index=0)
-
-            if mode != st.session_state.mode:
-                st.session_state.mode = mode
-                st.rerun()  # Refresh UI to show only selected mode
-
-            st.markdown(f"<h4>🔍 Mode Selected: {mode}</h4>", unsafe_allow_html=True)
-            
-            # **Sign Out Button in Sidebar**
-            if st.button("Sign out"):
-                st.session_state.user = None
-                st.session_state.uploaded_file_path = None
-                st.session_state.df = None
-                st.session_state.file_uploaded = False
-                st.rerun()
-
-
-        st.markdown(f"""<h1 style='text-align: center;text-shadow: 3px 3px 5px rgba(255, 255, 0, 0.5);'>
+    st.markdown(f"""<h1 style='text-align: center;text-shadow: 3px 3px 5px rgba(255, 255, 0, 0.5);'>
         <span style='color: #FFEA00;'> Chat</span> 
         <span style='color: #FFAB40;'>Analysis</span> 
         <span style='color: #00E5FF;'>Playground</span>
         </h1>""" , unsafe_allow_html=True)
-        st.write(f"Analysis started for mode: **{mode}**")
-
-        df = st.session_state.df
-        #fetch unique users
+    
+    st.write(f"🧠 Analysis started for mode: **{mode}**")
        
 
-        if mode == "Chat Statistics":
+    if mode == "Chat Statistics":
             user_list = df['user'].unique().tolist()
             user_list.sort()
             user_list.insert(0,"Overall")
@@ -219,7 +156,7 @@ if st.session_state.user:
                 with col4:
                     st.markdown(f"<h3 style='color: #00FFFF;'>Most Active Period</h3>", unsafe_allow_html=True)
                     st.subheader(active_period)
-        elif mode == "Timeline Analysis":
+    elif mode == "Timeline Analysis":
             user_list = df['user'].unique().tolist()
             user_list.sort()
             user_list.insert(0,"Overall")
@@ -282,7 +219,7 @@ if st.session_state.user:
 
 
 
-        elif mode == "Activity Map":
+    elif mode == "Activity Map":
             user_list = df['user'].unique().tolist()
             user_list.sort()
             user_list.insert(0,"Overall")
@@ -356,7 +293,7 @@ if st.session_state.user:
                 st.pyplot(fig)
 
 
-        elif mode == "Word Cloud":
+    elif mode == "Word Cloud":
 
             st.markdown("""
     <h1 style='text-align: center; 
@@ -437,8 +374,8 @@ if st.session_state.user:
                 st.pyplot(fig)
 
 
-        elif mode == "Detective Mode":
-            if user_role == "investigator":
+    elif mode == "Detective Mode":
+
 
                 st.markdown("""
 ### 🕵️‍♂️ Detective Mode Activated
@@ -450,7 +387,7 @@ This section detects and highlights users who frequently use abusive language in
                 <h1 style='text-align: center; 
                color: #FFEA00;
                text-shadow: 3px 3px 5px rgba(255, 255, 0, 0.5);'>
-               Top 5 abusive users
+               Top 1-5 abusive users
                 </h1>
                """, unsafe_allow_html=True)
                 new_df = df[~df['message'].str.contains('media omitted', case=False, na=False)]
@@ -483,119 +420,129 @@ This section detects and highlights users who frequently use abusive language in
                 # Step 4: Profanity Detection
                 if st.button("Show Analysis") or selected_user == 'Overall':
                     from better_profanity import profanity
+                    from collections import Counter
+                    import re
 
                     # Hindi + English abuses
-                    abusive_words = ["motherfucker", "bitch", "bastard", "asshole", "hell", "fuck", "shit",
-                        "chutiya", "bhosdike", "madarchod", "behenchod", "gandu", "launde", "randi", 
-                        "loda", "lodu",  "bhenchod", "chod", "gaand", "gand" , "lund" , "randwe" ,"betichod" , "kute" , "mc" , "bc" ,"bkl" ,"chodu", "gaandfad" , "gaaaandfaaad", 'raand' , "chakke", 'tatti']
+                    abusive_words = ["motherfucker", "bitch", "bastard", "asshole", "hell", "fuck", "shit", "harami", "suar", "suaro",
+                                    "chutiya", "bhosdike", "madarchod", "behenchod", "gandu", "launde", "randi", "loda", "lodu",
+                                    "bhenchod", "chod", "gaand", "gand", "lund", "randwe", "betichod", "kute", "mc", "bc", "bkl",
+                                    "chodu", "gaandfad", "gaaaandfaaad", "raand", "chakke", "tatti" , "nigga", "nigger", "dumbass", "prick", "retard", "jerk", "douche", "piss", "slut", "whore" , "motherfuckers",
+                                    "fuck", "shit", "bitch", "asshole", "nigga", "nigger", 
+                                    "dumbass", "prick", "retard", "jerk", "douche", "slut", "whore", "cock", "dick",
+                                    "pussy", "balls", "bollocks", "cunt", "screw", "damn", "piss", "crap", "hoe", 
+                                    "twat", "wanker", "arse", "bugger", "bollock", "shithead", "fucker", "slutty", 
+                                    "scumbag", "dipshit", "twatwaffle", "skank", "slag", "moron", "idiot", 'fuckers' , "motherfuckers" , "niggas" , "chutad" , "randiya", "suck", "stupid",
+                                    "motherfucker", "motherfuckers", "fucker", "fuckers", "fucking", "fuck", "fucks",
+                                    "bitch", "bitches", "bitchy",
+                                    "bastard", "bastards",
+                                    "asshole", "assholes", "asshat", "asshats",
+                                    "hell", "damn", "damned",
+                                    "shit", "shits", "shitty", "shithead",
+                                    "harami", "haramis",
+                                    "suar", "suaro", "suaron", "kutte", "kuttey", "kutta", "kutiya", "kuttiya",
+                                    "chutiya", "chutiyon", "chutiyapa",
+                                    "bhosdike", "bhosdika","bhosdiwala" , "bhosdiwali" ,
+                                    "madarchod", "madarchodon", "mc",
+                                    "behenchod", "bhenchod", "bc",
+                                    "gandu", "gandus", "gandugiri",
+                                    "launde", "launda", "laundey",
+                                    "randi", "randis", "randiya", "raand", "raandiyan",
+                                    "loda", "lodu", "lund", "lunds",
+                                    "chod", "chodon", "chodu", "chudai", "chutad",
+                                    "gaand", "gand", "gaandfad", "gaandfadi", "gaandfattu", "gaandfat",
+                                    "randwe", "betichod",
+                                    "chakke", "chakka", "chakkas",
+                                    "tatti", "tatty", "tattiyan",
+                                    "nigga", "niggas",
+                                    "nigger", "niggers",
+                                    "dumbass", "dumbasses", "dumb",
+                                    "prick", "pricks",
+                                    "retard", "retards", "retarded",
+                                    "jerk", "jerks",
+                                    "douche", "douches", "douchebag", "douchebags",
+                                    "piss", "pissy",
+                                    "slut", "sluts", "slutty",
+                                    "whore", "whores", "whorish",
+                                    "cock", "cocks", "cocky",
+                                    "dick", "dicks", "dickhead", "dickheads",
+                                    "pussy", "pussies",
+                                    "balls", "ballsy",
+                                    "bollocks", "bollock",
+                                    "cunt", "cunts",
+                                    "screw", "screwed", "screwing",
+                                    "crap", "crappy",
+                                    "hoe", "hoes",
+                                    "twat", "twats", "twatwaffle",
+                                    "wanker", "wankers",
+                                    "arse", "arses", "arsehole", "arseholes",
+                                    "bugger", "buggers",
+                                    "shithead", "shitheads",
+                                    "fucker", "fuckers",
+                                    "scumbag", "scumbags",
+                                    "dipshit", "dipshits",
+                                    "skank", "skanks",
+                                    "slag", "slags",    
+                                    "moron", "morons",
+                                    "idiot", "idiots", "idiotic",
+                                    "suck", "sucks", "sucking",
+                                    "stupid" , "mc" , "bc" , "mkl" , "bkl" , "gandfad" ,"gandfati", "fuddu" , "bund" , "mayova" , "mayo"
+                                    "fuckboy " ,"rape" , "rapis"
+                                ]
+
+
+
                     profanity.add_censor_words(abusive_words)
 
+                    # Filter based on user
                     if selected_user != "Overall":
                         temp_df = new_df[new_df['user'] == selected_user]
                     else:
                         temp_df = new_df.copy()
 
+                    # Detect abusive messages
                     temp_df['is_abusive'] = temp_df['message'].apply(lambda x: profanity.contains_profanity(str(x).lower()))
+                    
+                    # Count abusive messages by user
                     abusive_counts = temp_df[temp_df['is_abusive']].groupby('user')['message'].count().sort_values(ascending=False).head(5)
 
-                    st.markdown("### 🔥 Top 5 Users Sending Abusive Messages")
+                    st.markdown("###  Abusive word counts of top 1-5 users")
                     st.bar_chart(abusive_counts)
 
-                    # Expander for messages + top 3 abusive words
+                    # Show detailed analysis in expander
                     with st.expander("View abusive messages"):
                         for user in abusive_counts.index:
-                            st.markdown(f"**{user}**")
+                            st.markdown(f"### 👤 {user}")
 
                             user_msgs = temp_df[(temp_df['user'] == user) & (temp_df['is_abusive'])]['message'].tolist()
 
                             # Count abusive words
                             word_counts = Counter()
                             for msg in user_msgs:
-                                words = re.findall(r'\b\w+\b', msg.lower())  # Extract words
+                                words = re.findall(r'\b\w+\b', msg.lower())  # Extract individual words
                                 abusive_in_msg = [word for word in words if word in abusive_words]
                                 word_counts.update(abusive_in_msg)
 
                             top_abuses = word_counts.most_common(5)
 
-                            st.markdown("🧨 **Top 5 abusive words used by user:**")
-                            for word, count in top_abuses:
-                                st.write(f"- {word} → {count} times")
+                            st.markdown("🧨 **Top 1-5 abusive words used by user:**")
+                            if top_abuses:
+                                for word, count in top_abuses:
+                                    st.write(f"- {word} → {count} times")
+                            else:
+                                st.write("No abusive words found for this user.")
 
                             st.markdown("💬 **Sample Abusive Messages:**")
-                            for msg in user_msgs[:5]:
-                                st.write(f"- {msg}")                
-            else:
-                st.warning("🚫 You do not have access to Detective Mode!")
-                st.markdown("""
-### 🕵️‍♂️ About Detective Mode
-This section detects and highlights users who frequently use abusive language in the group. It also shows sample messages and top bad words used by them.
-""")
-                
+                            if user_msgs:
+                                for msg in user_msgs[:5]:
+                                    st.write(f"- {msg}")
+                            else:
+                                st.write("No abusive messages available for this user.")
 
-                st.markdown("## 🔐 Request Access to Detective Mode")
-                st.info("""
-                This mode helps detect and visualize abusive content in chats. 
-                Access is limited to trusted users for privacy and safety reasons.
-
-                📩 **To request access**, please send an email to  
-                **vinayakchhabra545.vc@gmail.com**  
-                with the following details:
-                - The email ID you used to sign up on **What'sInsight**
-                - A short reason why you need access to this feature
-
-                We’ll review your request and get back to you shortly.
-                """)
+                            st.markdown("---")  
 
 
 
-# Login UI (If User Not Logged In)
-else:
-    st.markdown("""
-    <h1 style='text-align: center;
-            text-shadow: 3px 3px 5px rgba(138, 43, 226, 0.7);'>
-            Welcome to <span style='color: violet;'>What's Insight 🤔</span>
-    </h1>
-    """, unsafe_allow_html=True)
-
-    auth_option = st.radio("Select an option:", ["Login", "Sign Up"])
-
-    if auth_option == "Login":
-        email = st.text_input("Email Address")
-        password = st.text_input("Password", type="password")
-        if st.button("Login"):
-            try:
-                st.session_state.user = auth_manager.login(email, password)
-                if st.session_state.user:
-                    st.success("Login Successful! 🎉")
-                    time.sleep(1)
-                    st.rerun() 
-                else:
-                    st.error("Incorrect username or password. Please try again!")
-            except Exception as e:
-                st.error(f"An error occurred during login: {str(e)}")
-
-    elif auth_option == "Sign Up":
-        email = st.text_input("Email Address")
-        password = st.text_input("Password", type="password")
-        if st.button("Signup"):
-            try:
-                signup_status = auth_manager.signup(email, password)
-
-                if signup_status == 0:
-                    st.error("Password too short! It must be at least 6 characters.")
-                elif signup_status == 1:
-                    st.warning("This email is already registered. Try logging in instead.")
-                elif signup_status == 2:
-                    st.success("Account created successfully! 🎉 Please login.")
-                    st.balloons()
-                    time.sleep(1)
-                    st.rerun()
-                else:
-                    st.error("Sign-up failed due to an unknown error. Please try again.")
-            except Exception as e:
-                st.error(f"An error occurred during signup: {str(e)}")
-
-    
 
 
 

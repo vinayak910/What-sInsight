@@ -6,9 +6,13 @@ from datetime import datetime
 class Preprocessor:
     def __init__(self):
         self.patterns = [
-            r'(\d{1,2}/\d{1,2}/\d{2,4}),\s(\d{1,2}:\d{2}(?:\s?[APap][Mm]))\s-\s([^:]+):\s(.+)',  # old dash format
-            r'\[(\d{1,2}/\d{1,2}/\d{2,4}),\s(\d{1,2}:\d{2}(?::\d{2})?\s?[APap][Mm])\]\s([^:]+):\s(.+)'  # new bracket format
+            # Old format with dash (handles both 12-hour and 24-hour time)
+            r'(\d{1,2}/\d{1,2}/\d{2,4}),\s(\d{1,2}:\d{2}(?::\d{2})?(?:\s?[APap][Mm])?)\s-\s([^:]+):\s(.+)',
+            
+            # New format with square brackets (also handles both time formats)
+            r'\[(\d{1,2}/\d{1,2}/\d{2,4}),\s(\d{1,2}:\d{2}(?::\d{2})?(?:\s?[APap][Mm])?)\]\s([^:]+):\s(.+)'
         ]
+
 
     def preprocess(self, file_contents):
         chat_data = file_contents.splitlines()
