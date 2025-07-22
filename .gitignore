@@ -1,53 +1,5 @@
-# Ignore Python bytecode and cache
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
+__pycache__
 
-# Ignore text files
-*.txt
+venv
 
-# Ignore virtual environment
-venv/
-.env/
-.venv/
-conda-meta/
-*.conda
-*.yaml  # If you want to ignore Conda environment YAML files
-
-# Ignore Anaconda project files
-*.lock
-*.bak
-*.db
-*.sqlite
-*.json  # If you don't want to track JSON metadata files
-*.yml   # If you want to ignore Conda YAML config files
-
-# Ignore Jupyter Notebook checkpoints
-.ipynb_checkpoints/
-
-# Ignore logs and temp files
-*.log
-*.tmp
-.DS_Store
-
-helper.py
-
-uploads/
-
-*.ipynb
-
-# Ignore Jupyter Notebook checkpoints
-.ipynb_checkpoints/
-
-# Ignore Jupyter Notebook output files (optional, if you clear outputs before committing, you might skip this)
-*.nbconvert.ipynb
-
-# Ignore all notebook files (if you don’t want to track any .ipynb files)
-# *.ipynb
-
-# Ignore Jupyter Notebook config files
-.jupyter/
-
-# Ignore hidden runtime files
-~$*.ipynb
+.ipynb_checkpoints
