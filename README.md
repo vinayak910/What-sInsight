@@ -23,3 +23,19 @@ A full-stack analytics app built using Python and Streamlit to extract deep insi
 - **Backend & Logic**: Python, Pandas, Regex
 - **Data Visualization**: Plotly, WordCloud
 - **NLP & Classification**: NLTK, TextBlob, Scikit-learn
+
+## How to Run This Project
+
+If you want to run this project locally, follow these steps:
+
+1. **Clone the repository**
+2. **Install the required libraries**
+3. **Run the project**
+
+Use Streamlit to run the app:
+streamlit run app.py
+
+
+---
+
+Now the WhatsInsight web app will open in your browser.
